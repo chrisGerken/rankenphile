@@ -239,10 +239,16 @@ public class EsClient {
 	public void putDocument(String index, String type, String id, JSONObject document ) throws EsServerException {
 		putDocument(index,type,id,document.toString());
 	}
+
+	public void putDocument(String index, String type, String id, JSONObject document, boolean sync ) throws EsServerException {
+		putDocument(index,type,id,document.toString(), sync);
+	}
 	
 	public void putDocument(String index, String type, String id, String document ) throws EsServerException {
-
-		boolean sync = true;
+		putDocument(index, type, id, document, true);
+	}
+	
+	public void putDocument(String index, String type, String id, String document, boolean sync ) throws EsServerException {
 		
 		IndexRequestBuilder indexRequestBuilder = getClient().prepareIndex(index,type,id).setSource(document);
 		ListenableActionFuture<IndexResponse> laf = indexRequestBuilder.execute();
