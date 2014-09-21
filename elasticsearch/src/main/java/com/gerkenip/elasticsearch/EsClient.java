@@ -11,6 +11,7 @@ import java.util.Set;
 import org.codehaus.jettison.json.JSONObject;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.ListenableActionFuture;
+import org.elasticsearch.action.admin.indices.flush.FlushRequest;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequestBuilder;
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
@@ -338,6 +339,12 @@ public class EsClient {
 	public void refresh(String index) throws ElasticSearchException, EsServerException {
 	
 		getClient().admin().indices().refresh(new RefreshRequest(index)).actionGet();
+		
+	}
+
+	public void flush(String index) throws ElasticSearchException, EsServerException {
+	
+		getClient().admin().indices().flush(new FlushRequest(index)).actionGet();
 		
 	}
 
