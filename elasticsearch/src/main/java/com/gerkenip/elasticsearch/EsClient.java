@@ -29,6 +29,9 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
+import org.elasticsearch.common.collect.ImmutableOpenMap;
+import org.elasticsearch.common.hppc.ObjectLookupContainer;
+import org.elasticsearch.common.hppc.cursors.ObjectCursor;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.ImmutableSettings.Builder;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
@@ -51,6 +54,8 @@ public class EsClient {
 
 	private ArrayList<EsDocumentSet> docSets = new ArrayList<EsDocumentSet>();
 	
+	private static EsClient instance = null;
+	
 	/*
 	 * Construct a client for the named cluster running on the given host and port
 	 */
@@ -63,8 +68,22 @@ public class EsClient {
 	/*
 	 * Convenience constructor for the local, defaul cluster
 	 */
-	public static EsClient localClient() {
-		return new EsClient("127.0.0.1", 9300, "elasticsearch");
+	public static synchronized EsClient localClient() {
+		return localClient(false);
+	}
+	
+	/*
+	 * Convenience constructor for the local, defaul cluster
+	 */
+	public static synchronized EsClient localClient(boolean reset) {
+		if (reset && (instance != null)) {
+			try { instance.close(); } catch (Throwable t) {  }
+			instance = null;
+		}
+		if (instance == null) {
+			instance = new EsClient("127.0.0.1", 9300, "elasticsearch");
+		}
+		return instance;
 	}
 	
 	/*
@@ -179,15 +198,19 @@ public class EsClient {
 	}
 	
 	public String[] getIndexes() throws EsServerException {
-		Map<String,IndexMetaData> mappings = getClient().admin().cluster().prepareState().execute().actionGet().getState().getMetaData().getIndices();
-		Set<String> keys = mappings.keySet();
+		ImmutableOpenMap<String,IndexMetaData> mappings = getClient().admin().cluster().prepareState().execute().actionGet().getState().getMetaData().getIndices();
+		ObjectLookupContainer<String> keys = mappings.keys();
 		String result[] = new String[keys.size()];
-		keys.toArray(result);
+		int i = 0;
+		for (ObjectCursor<String> key : keys) {
+			result[i] = key.value;
+			i++;
+		}
 		return result;
 	}
 
 	public boolean indexExists(String indexName) throws EsServerException {
-		Map<String,IndexMetaData> mappings = getClient().admin().cluster().prepareState().execute().actionGet().getState().getMetaData().getIndices();
+		ImmutableOpenMap<String, IndexMetaData> mappings = getClient().admin().cluster().prepareState().execute().actionGet().getState().getMetaData().getIndices();
 		return mappings.containsKey(indexName);
 	}
 	
@@ -266,6 +289,22 @@ public class EsClient {
 			throw new EsIndexDoesNotExistException(index);
 		}	
 		return imd.getMappings().containsKey(type);		
+	}
+	
+	public String[] getTypes(String index) throws EsIndexDoesNotExistException, EsServerException {
+		ClusterState cs = getClient().admin().cluster().prepareState().setFilterIndices(index).execute().actionGet().getState();
+		IndexMetaData imd = cs.getMetaData().index(index);
+		if (imd == null) {
+			throw new EsIndexDoesNotExistException(index);
+		}	
+		ObjectLookupContainer<String> keys = imd.getMappings().keys();
+		String result[] = new String[keys.size()];
+		int i = 0;
+		for (ObjectCursor<String> key : keys) {
+			result[i] = key.value;
+			i++;
+		}
+		return result;		
 	}
 
 	public void deleteType(String index, String type) throws EsServerException {
